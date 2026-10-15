@@ -1,0 +1,21 @@
+{
+  "name": "atelier-luxe-ecommerce",
+  "version": "1.0.0",
+  "description": "Decoupled E-Commerce Web Application for Luxury Apparel and Clothing",
+  "main": "server_dev.js",
+  "scripts": {
+    "dev": "node server_dev.js",
+    "start": "node server_dev.js"
+  },
+  "keywords": [
+    "ecommerce",
+    "clothing",
+    "apparel",
+    "decoupled",
+    "bootstrap",
+    "express",
+    "sqlite3"
+  ],
+  "author": "Software Architect",
+  "license": "ISC"
+}
