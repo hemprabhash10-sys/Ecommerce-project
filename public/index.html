@@ -46,6 +46,15 @@
 
       <!-- Action Buttons (Theme, Wishlist, Cart) -->
       <div class="d-flex align-items-center gap-2">
+        <!-- Add Product / Upload Button -->
+        <button class="btn btn-sm btn-atelier-primary d-inline-flex align-items-center gap-1 py-1 px-3" onclick="window.app.openAddProductModal()" title="Add Product & Upload Image to Local Folder">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          <span class="d-none d-sm-inline">Add Garment</span>
+        </button>
+
         <!-- Theme Toggle -->
         <button id="theme-toggle-btn" class="nav-icon-btn" aria-label="Toggle Dark / Light Theme" title="Toggle Theme">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -531,6 +540,111 @@
           <!-- Populated dynamically by window.ui.renderOrderReceipt -->
         </div>
 
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Product / Local Image Upload Modal -->
+  <div class="modal fade modal-atelier" id="add-product-modal" tabindex="-1" aria-labelledby="addProductModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content atelier-modal-content">
+        <div class="modal-header border-subtle">
+          <div>
+            <h5 class="modal-title font-serif h5 mb-1" id="addProductModalLabel">Add Garment & Upload Imagery</h5>
+            <p class="small text-muted mb-0">Saved directly to local folder (<code>public/uploads/</code>) and SQLite database</p>
+          </div>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+
+        <div class="modal-body p-4">
+          <form id="add-product-form" onsubmit="window.app.handleAddProductSubmit(event)">
+            <div class="row g-3">
+              <!-- Garment Title -->
+              <div class="col-md-8">
+                <label class="form-label small text-muted">Garment Title *</label>
+                <input type="text" id="new-prod-title" required class="form-control form-atelier-control" placeholder="e.g. Italian Cashmere Trench Coat">
+              </div>
+
+              <!-- Category -->
+              <div class="col-md-4">
+                <label class="form-label small text-muted">Category *</label>
+                <select id="new-prod-category" required class="form-select form-atelier-control">
+                  <option value="outerwear">Outerwear</option>
+                  <option value="knitwear">Knitwear</option>
+                  <option value="shirts">Shirts</option>
+                  <option value="pants">Trousers & Pants</option>
+                  <option value="accessories">Accessories</option>
+                </select>
+              </div>
+
+              <!-- Price & Compare Price -->
+              <div class="col-sm-6">
+                <label class="form-label small text-muted">Price ($ USD) *</label>
+                <input type="number" id="new-prod-price" required step="0.01" min="1" class="form-control form-atelier-control" placeholder="285.00">
+              </div>
+              <div class="col-sm-6">
+                <label class="form-label small text-muted">Compare-At / Original Price ($)</label>
+                <input type="number" id="new-prod-compare" step="0.01" min="1" class="form-control form-atelier-control" placeholder="350.00 (optional)">
+              </div>
+
+              <!-- Badge Tag -->
+              <div class="col-sm-6">
+                <label class="form-label small text-muted">Badge / Capsule Tag</label>
+                <select id="new-prod-badge" class="form-select form-atelier-control">
+                  <option value="">None</option>
+                  <option value="NEW">NEW</option>
+                  <option value="HOT">HOT</option>
+                  <option value="SALE">SALE</option>
+                  <option value="LIMITED">LIMITED</option>
+                </select>
+              </div>
+
+              <!-- Brand -->
+              <div class="col-sm-6">
+                <label class="form-label small text-muted">Label / Brand</label>
+                <input type="text" id="new-prod-brand" class="form-control form-atelier-control" value="Atelier Luxe">
+              </div>
+
+              <!-- Local Image File Upload (Multer engine) -->
+              <div class="col-12">
+                <label class="form-label small text-muted d-flex justify-content-between">
+                  <span>Upload Garment Imagery (Saved to <code>public/uploads/</code>) *</span>
+                  <span class="badge bg-secondary-subtle text-secondary font-monospace">Multer Local Engine</span>
+                </label>
+                <input type="file" id="new-prod-file" accept="image/*" class="form-control form-atelier-control" onchange="window.app.previewUploadedImage(event)">
+                <div class="form-text small text-muted">Accepts JPEG, PNG, WebP up to 8MB. File is written directly to disk.</div>
+                
+                <!-- Live Preview Container -->
+                <div id="new-prod-img-preview-box" class="mt-2 p-2 border border-subtle rounded d-none align-items-center gap-3">
+                  <img id="new-prod-img-preview" src="" alt="Preview" style="width: 70px; height: 90px; object-fit: cover; border-radius: 4px;">
+                  <div>
+                    <div id="new-prod-img-name" class="fw-semibold small text-truncate" style="max-width: 250px;"></div>
+                    <div class="small text-accent">Ready for local upload</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Garment Description -->
+              <div class="col-12">
+                <label class="form-label small text-muted">Garment Narrative & Description</label>
+                <textarea id="new-prod-desc" rows="3" class="form-control form-atelier-control" placeholder="Crafted with bespoke precision, double-faced wool, horn buttons, and tailored proportions..."></textarea>
+              </div>
+            </div>
+
+            <!-- Modal Footer Actions -->
+            <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top border-subtle">
+              <button type="button" class="btn btn-atelier-outline" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" id="btn-save-garment" class="btn btn-atelier-primary">
+                Save Garment to Catalog
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="17 8 12 3 7 8"></polyline>
+                  <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   </div>

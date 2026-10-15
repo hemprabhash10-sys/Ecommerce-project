@@ -2,8 +2,7 @@
  * ATELIER LUXE - DECOUPLED API SERVICE LAYER (api.js)
  *
  * Implements a clean REST-like client interface.
- * Phase 1: Local state & localStorage with async simulated network latency.
- * Phase 2: Seamlessly switches to Express.js REST API endpoints:
+ * Phase 2: Connected to Express.js REST API endpoints:
  *   - GET  /api/products
  *   - GET  /api/products/:id
  *   - POST /api/cart
@@ -13,7 +12,7 @@
 
 class ApiService {
   constructor() {
-    this.isRemote = false; // Toggle to true when Express backend is running in Phase 2
+    this.isRemote = true; // Phase 2: Live Express.js backend is active
     this.baseUrl = "/api";
     this.storageKeys = {
       PRODUCTS: "atelier_products_v1",
@@ -23,6 +22,27 @@ class ApiService {
     };
 
     this.initializeLocalStorage();
+  }
+
+  // Generate a persistent session ID for server-side cart/wishlist tracking
+  getSessionId() {
+    let sid = localStorage.getItem('atelier_session_id');
+    if (!sid) {
+      sid = 'sess-' + Math.random().toString(36).substr(2, 16);
+      localStorage.setItem('atelier_session_id', sid);
+    }
+    return sid;
+  }
+
+  apiFetch(path, options = {}) {
+    return fetch(this.baseUrl + path, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Session-Id': this.getSessionId(),
+        ...(options.headers || {})
+      }
+    }).then(r => r.json());
   }
 
   initializeLocalStorage() {
@@ -50,9 +70,9 @@ class ApiService {
    */
   async getProducts(params = {}) {
     if (this.isRemote) {
-      const query = new URLSearchParams(params).toString();
-      const res = await fetch(`${this.baseUrl}/products?${query}`);
-      return await res.json();
+      const queryStr = new URLSearchParams(params).toString();
+      const res = await this.apiFetch(`/products?${queryStr}`);
+      return res.data || [];
     }
 
     // Local / Phase 1 implementation
@@ -112,8 +132,8 @@ class ApiService {
    */
   async getProductById(id) {
     if (this.isRemote) {
-      const res = await fetch(`${this.baseUrl}/products/${id}`);
-      return await res.json();
+      const res = await this.apiFetch(`/products/${id}`);
+      return res.data || null;
     }
 
     const products = JSON.parse(localStorage.getItem(this.storageKeys.PRODUCTS) || "[]");
@@ -123,12 +143,29 @@ class ApiService {
   }
 
   /**
+   * Create a new product (POST /api/products)
+   */
+  async createProduct(productData) {
+    if (this.isRemote) {
+      const res = await this.apiFetch('/products', {
+        method: 'POST',
+        body: JSON.stringify(productData)
+      });
+      return res.data || res;
+    }
+    const products = JSON.parse(localStorage.getItem(this.storageKeys.PRODUCTS) || "[]");
+    products.unshift(productData);
+    localStorage.setItem(this.storageKeys.PRODUCTS, JSON.stringify(products));
+    return this._simulateNetworkDelay(productData);
+  }
+
+  /**
    * Retrieve Cart items
    */
   async getCart() {
     if (this.isRemote) {
-      const res = await fetch(`${this.baseUrl}/cart`);
-      return await res.json();
+      const res = await this.apiFetch('/cart');
+      return (res.data && res.data.items) || [];
     }
     const cart = JSON.parse(localStorage.getItem(this.storageKeys.CART) || "[]");
     return this._simulateNetworkDelay(cart);
@@ -139,12 +176,11 @@ class ApiService {
    */
   async saveCart(items) {
     if (this.isRemote) {
-      const res = await fetch(`${this.baseUrl}/cart`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const res = await this.apiFetch('/cart', {
+        method: 'POST',
         body: JSON.stringify({ items })
       });
-      return await res.json();
+      return res;
     }
     localStorage.setItem(this.storageKeys.CART, JSON.stringify(items));
     return this._simulateNetworkDelay({ success: true, count: items.length });
@@ -155,8 +191,8 @@ class ApiService {
    */
   async getWishlist() {
     if (this.isRemote) {
-      const res = await fetch(`${this.baseUrl}/wishlist`);
-      return await res.json();
+      const res = await this.apiFetch('/wishlist');
+      return res.data || [];
     }
     const wishlist = JSON.parse(localStorage.getItem(this.storageKeys.WISHLIST) || "[]");
     return this._simulateNetworkDelay(wishlist);
@@ -166,10 +202,13 @@ class ApiService {
    * Toggle Wishlist item
    */
   async toggleWishlist(productId) {
+    if (this.isRemote) {
+      const res = await this.apiFetch(`/wishlist/${productId}`, { method: 'POST', body: '{}' });
+      return res;
+    }
     const wishlist = JSON.parse(localStorage.getItem(this.storageKeys.WISHLIST) || "[]");
     const index = wishlist.indexOf(productId);
     let isSaved = false;
-
     if (index > -1) {
       wishlist.splice(index, 1);
       isSaved = false;
@@ -177,7 +216,6 @@ class ApiService {
       wishlist.push(productId);
       isSaved = true;
     }
-
     localStorage.setItem(this.storageKeys.WISHLIST, JSON.stringify(wishlist));
     return this._simulateNetworkDelay({ productId, isSaved, total: wishlist.length });
   }
@@ -186,18 +224,18 @@ class ApiService {
    * Validate Promo Code
    */
   async validatePromoCode(code) {
+    if (this.isRemote) {
+      const res = await this.apiFetch('/promo/validate', {
+        method: 'POST',
+        body: JSON.stringify({ code })
+      });
+      return res;
+    }
     const cleanCode = (code || "").trim().toUpperCase();
     if (PROMO_CODES[cleanCode]) {
-      return this._simulateNetworkDelay({
-        valid: true,
-        code: cleanCode,
-        ...PROMO_CODES[cleanCode]
-      });
+      return this._simulateNetworkDelay({ valid: true, code: cleanCode, ...PROMO_CODES[cleanCode] });
     }
-    return this._simulateNetworkDelay({
-      valid: false,
-      message: "Invalid or expired promotion code."
-    });
+    return this._simulateNetworkDelay({ valid: false, message: "Invalid or expired promotion code." });
   }
 
   /**
@@ -205,12 +243,11 @@ class ApiService {
    */
   async submitOrder(orderPayload) {
     if (this.isRemote) {
-      const res = await fetch(`${this.baseUrl}/orders`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const res = await this.apiFetch('/orders', {
+        method: 'POST',
         body: JSON.stringify(orderPayload)
       });
-      return await res.json();
+      return res.data || res;
     }
 
     const orderId = `ATL-${Math.floor(100000 + Math.random() * 900000)}`;
@@ -241,13 +278,15 @@ class ApiService {
    * In Phase 2: Will send multipart/form-data via POST to Express `/api/upload`
    * which saves files directly to `public/uploads/` on the server disk!
    */
-  async uploadProductImage(file) {
+  async uploadProductImage(file, productId = null) {
     if (this.isRemote) {
       const formData = new FormData();
-      formData.append("image", file);
+      formData.append('image', file);
+      if (productId) formData.append('productId', productId);
       const res = await fetch(`${this.baseUrl}/upload`, {
-        method: "POST",
-        body: formData
+        method: 'POST',
+        headers: { 'X-Session-Id': this.getSessionId() },
+        body: formData  // Do NOT set Content-Type; browser sets it with boundary
       });
       return await res.json();
     }

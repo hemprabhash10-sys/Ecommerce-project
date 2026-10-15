@@ -395,6 +395,139 @@ class AppController {
     this.refreshCatalog();
   }
 
+  // --- Add Product & Local Image Upload Handlers ---
+  openAddProductModal() {
+    const modalEl = document.getElementById("add-product-modal");
+    if (!modalEl) return;
+    const modal = new bootstrap.Modal(modalEl);
+    modal.show();
+  }
+
+  previewUploadedImage(event) {
+    const file = event.target.files && event.target.files[0];
+    const previewBox = document.getElementById("new-prod-img-preview-box");
+    const previewImg = document.getElementById("new-prod-img-preview");
+    const previewName = document.getElementById("new-prod-img-name");
+
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        if (previewImg) previewImg.src = e.target.result;
+        if (previewName) previewName.textContent = file.name;
+        if (previewBox) {
+          previewBox.classList.remove("d-none");
+          previewBox.classList.add("d-flex");
+        }
+      };
+      reader.readAsDataURL(file);
+    } else {
+      if (previewBox) {
+        previewBox.classList.remove("d-flex");
+        previewBox.classList.add("d-none");
+      }
+    }
+  }
+
+  async handleAddProductSubmit(event) {
+    event.preventDefault();
+    const saveBtn = document.getElementById("btn-save-garment");
+    if (saveBtn) {
+      saveBtn.disabled = true;
+      saveBtn.innerHTML = `
+        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+        Saving to Local Folder & SQLite...
+      `;
+    }
+
+    try {
+      const title = document.getElementById("new-prod-title").value.trim();
+      const category = document.getElementById("new-prod-category").value;
+      const price = parseFloat(document.getElementById("new-prod-price").value);
+      const comparePriceVal = document.getElementById("new-prod-compare").value;
+      const compareAtPrice = comparePriceVal ? parseFloat(comparePriceVal) : null;
+      const badge = document.getElementById("new-prod-badge").value || null;
+      const brand = document.getElementById("new-prod-brand").value.trim() || "Atelier Luxe";
+      const description = document.getElementById("new-prod-desc").value.trim();
+      const fileInput = document.getElementById("new-prod-file");
+      const file = fileInput.files && fileInput.files[0];
+
+      let imageUrl = "/images/product_wool_overcoat.jpg"; // Default fallback if no file uploaded
+
+      // 1. If file selected, upload via Multer to public/uploads/
+      if (file) {
+        const uploadRes = await window.apiService.uploadProductImage(file);
+        if (uploadRes && uploadRes.url) {
+          imageUrl = uploadRes.url;
+        }
+      }
+
+      // 2. Prepare Product payload
+      const newProduct = {
+        id: `prod_${Date.now()}`,
+        title,
+        brand,
+        category,
+        gender: "unisex",
+        price,
+        compareAtPrice,
+        rating: 5.0,
+        reviewCount: 1,
+        badge,
+        description: description || `Exclusively tailored ${title.toLowerCase()} crafted with artisanal precision.`,
+        fabricDetails: ["Bespoke Tailoring", "Locally Uploaded Image Asset", "Hand-finished Details"],
+        careInstructions: ["Specialist dry clean only", "Store on broad cedar hanger"],
+        images: [imageUrl],
+        colors: [{ name: "Artisanal Natural", hex: "#2b2b2b" }],
+        sizes: ["S", "M", "L", "XL"],
+        inStock: true,
+        stockCount: 12,
+        isFeatured: true
+      };
+
+      // 3. Persist product into SQLite database
+      await window.apiService.createProduct(newProduct);
+
+      // 4. Close modal and reset form
+      const modalEl = document.getElementById("add-product-modal");
+      const modal = bootstrap.Modal.getInstance(modalEl);
+      if (modal) modal.hide();
+      document.getElementById("add-product-form").reset();
+      const previewBox = document.getElementById("new-prod-img-preview-box");
+      if (previewBox) {
+        previewBox.classList.remove("d-flex");
+        previewBox.classList.add("d-none");
+      }
+
+      // 5. Notify user and refresh grid
+      window.ui.showToast({
+        type: "success",
+        title: "Garment Added to Catalog",
+        message: `"${title}" was saved to SQLite database and imagery stored in public/uploads/!`
+      });
+
+      await this.refreshCatalog();
+    } catch (err) {
+      console.error("Failed to add product:", err);
+      window.ui.showToast({
+        type: "error",
+        title: "Creation Error",
+        message: err.message || "Could not save garment. Please check the inputs."
+      });
+    } finally {
+      if (saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = `
+          Save Garment to Catalog
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="17 8 12 3 7 8"></polyline>
+            <line x1="12" y1="3" x2="12" y2="15"></line>
+          </svg>
+        `;
+      }
+    }
+  }
+
   handleUrlParams() {
     const urlParams = new URLSearchParams(window.location.search);
     const category = urlParams.get("category");
