@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "dev:frontend": "node server_dev.js"
+    "dev:frontend": "node server_dev.js",
+    "test": "node tests/test_api.js"
   },
   "keywords": ["ecommerce", "clothing", "express", "sqlite3", "bootstrap", "decoupled"],
   "author": "Software Architect",

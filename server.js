@@ -89,25 +89,54 @@ app.use((err, req, res, next) => {
 });
 
 // ─── Bootstrap Database & Start Server ───────────────────────────────────────
-(async () => {
-  try {
-    await bootstrap();
+let isBootstrapped = false;
+let bootstrapPromise = null;
 
-    app.listen(PORT, () => {
-      console.log('\n');
-      console.log('┌──────────────────────────────────────────────────────────┐');
-      console.log('│         ATELIER LUXE E-Commerce Platform Running          │');
-      console.log('│                                                          │');
-      console.log(`│  Storefront:  http://localhost:${PORT}                       │`);
-      console.log(`│  REST API:    http://localhost:${PORT}/api                   │`);
-      console.log(`│  Health:      http://localhost:${PORT}/api/health            │`);
-      console.log(`│  Database:    SQLite3 → database/ecommerce.db            │`);
-      console.log(`│  Uploads:     public/uploads/                            │`);
-      console.log('└──────────────────────────────────────────────────────────┘');
-      console.log('\nRequest log:\n');
+async function ensureDbReady() {
+  if (isBootstrapped) return;
+  if (!bootstrapPromise) {
+    bootstrapPromise = bootstrap().then(() => {
+      isBootstrapped = true;
     });
-  } catch (err) {
-    console.error('Failed to start server:', err);
-    process.exit(1);
   }
-})();
+  return bootstrapPromise;
+}
+
+// Middleware to ensure DB is initialized on serverless request invocations
+app.use(async (req, res, next) => {
+  try {
+    await ensureDbReady();
+    next();
+  } catch (err) {
+    next(err);
+  }
+});
+
+// If running directly as a standalone Node.js process (local dev or traditional hosting)
+if (require.main === module || !process.env.VERCEL) {
+  (async () => {
+    try {
+      await ensureDbReady();
+
+      app.listen(PORT, () => {
+        console.log('\n');
+        console.log('┌──────────────────────────────────────────────────────────┐');
+        console.log('│         ATELIER LUXE E-Commerce Platform Running          │');
+        console.log('│                                                          │');
+        console.log(`│  Storefront:  http://localhost:${PORT}                       │`);
+        console.log(`│  REST API:    http://localhost:${PORT}/api                   │`);
+        console.log(`│  Health:      http://localhost:${PORT}/api/health            │`);
+        console.log(`│  Database:    SQLite3 → database/ecommerce.db            │`);
+        console.log(`│  Uploads:     public/uploads/                            │`);
+        console.log('└──────────────────────────────────────────────────────────┘');
+        console.log('\nRequest log:\n');
+      });
+    } catch (err) {
+      console.error('Failed to start server:', err);
+      process.exit(1);
+    }
+  })();
+}
+
+// Export for Vercel Serverless Functions
+module.exports = app;

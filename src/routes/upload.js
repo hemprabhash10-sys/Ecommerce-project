@@ -16,7 +16,11 @@ const path = require('path');
 const fs = require('fs');
 const { run, query } = require('../db/database');
 
-const UPLOADS_DIR = path.join(__dirname, '..', '..', 'public', 'uploads');
+// On Vercel, serverless filesystem is read-only except /tmp
+const IS_VERCEL = !!process.env.VERCEL;
+const UPLOADS_DIR = IS_VERCEL
+  ? path.join('/tmp', 'uploads')
+  : path.join(__dirname, '..', '..', 'public', 'uploads');
 
 // Ensure uploads directory exists
 if (!fs.existsSync(UPLOADS_DIR)) {

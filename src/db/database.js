@@ -3,10 +3,30 @@
  * SQLite3 connection, schema creation, and seed data migration.
  */
 
+const fs = require('fs');
 const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
 
-const DB_PATH = path.join(__dirname, '..', '..', 'database', 'ecommerce.db');
+// Support both local development and Vercel serverless (/tmp writable filesystem)
+const IS_VERCEL = !!process.env.VERCEL;
+const ORIGINAL_DB_PATH = path.join(__dirname, '..', '..', 'database', 'ecommerce.db');
+
+let DB_PATH = ORIGINAL_DB_PATH;
+if (IS_VERCEL) {
+  const tmpDir = path.join('/tmp', 'atelier_data');
+  if (!fs.existsSync(tmpDir)) {
+    try { fs.mkdirSync(tmpDir, { recursive: true }); } catch (e) {}
+  }
+  DB_PATH = path.join(tmpDir, 'ecommerce.db');
+  // Copy seed database to /tmp if it doesn't exist yet
+  if (!fs.existsSync(DB_PATH) && fs.existsSync(ORIGINAL_DB_PATH)) {
+    try {
+      fs.copyFileSync(ORIGINAL_DB_PATH, DB_PATH);
+    } catch (e) {
+      console.warn('Could not copy original DB to /tmp, will initialize new DB:', e.message);
+    }
+  }
+}
 
 let db;
 
